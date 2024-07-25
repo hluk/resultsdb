@@ -120,6 +120,23 @@ def prev_next_urls(data, limit=QUERY_LIMIT):
 # =============================================================================
 
 
+def add_group(grp):
+    if isinstance(grp, (str, bytes)):
+        grp = dict(uuid=grp)
+    elif isinstance(grp, dict):
+        grp["uuid"] = grp.get("uuid", str(uuid.uuid1()))
+
+    group = Group.query.filter_by(uuid=grp["uuid"]).first()
+    if not group:
+        group = Group(uuid=grp["uuid"])
+
+    group.description = grp.get("description", group.description)
+    group.ref_url = grp.get("ref_url", group.ref_url)
+
+    db.session.add(group)
+    return group
+
+
 @api.route("/groups", methods=["GET"])
 @validate()
 def get_groups(query: GroupsParams):
@@ -407,7 +424,7 @@ def get_results_latest(query: ResultsParams):
             jsonify(
                 {
                     "message": (
-                        "Please, provide at least one " "filter beside '_distinct_on'"
+                        "Please, provide at least one filter beside '_distinct_on'"
                     )
                 }
             ),
@@ -508,23 +525,7 @@ def create_result_any_data(body: CreateResultParams):
     #  when a group defined by the string is not found, new is created
     #  group defined by the object, is updated/created with the values from the object
     # non-existing groups are created automatically
-    groups = []
-    if body.groups:
-        for grp in body.groups:
-            if isinstance(grp, (str, bytes)):
-                grp = dict(uuid=grp)
-            elif isinstance(grp, dict):
-                grp["uuid"] = grp.get("uuid", str(uuid.uuid1()))
-
-            group = Group.query.filter_by(uuid=grp["uuid"]).first()
-            if not group:
-                group = Group(uuid=grp["uuid"])
-
-            group.description = grp.get("description", group.description)
-            group.ref_url = grp.get("ref_url", group.ref_url)
-
-            db.session.add(group)
-            groups.append(group)
+    groups = [add_group(group) for group in (body.groups or [])]
 
     result = Result(
         testcase, body.outcome, groups, body.ref_url, body.note, body.submit_time
@@ -652,7 +653,7 @@ def landing_page():
                 "message": "Everything is fine. But choose wisely, for while "
                 "the true Grail will bring you life, the false "
                 "Grail will take it from you.",
-                "documentation": "http://docs.resultsdb20.apiary.io/",
+                "documentation": "https://docs.resultsdb20.apiary.io/",
                 "groups": url_for(".get_groups", _external=True),
                 "results": url_for(".get_results", _external=True),
                 "testcases": url_for(".get_testcases", _external=True),
