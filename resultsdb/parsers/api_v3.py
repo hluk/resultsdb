@@ -256,10 +256,10 @@ class ResultParamsBase(BaseModel):
             else:
                 yield (name, str(value))
 
-    @field_validator("outcome", mode="before")
+    @field_validator("outcome", mode="after")
     @classmethod
     def outcome_must_be_valid(cls, v):
-        if not isinstance(v, str) or v.upper() not in result_outcomes_extended():
+        if v.upper() not in result_outcomes_extended():
             raise ValueError(
                 f'must be one of: {", ".join(sorted(result_outcomes_extended()))}'
             )
