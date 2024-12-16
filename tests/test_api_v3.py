@@ -161,17 +161,36 @@ def test_api_v3_scratch_build(client):
     assert r.json["data"]["type"] == ["brew-build_scratch"]
 
 
-def test_api_v3_outcome_upper_case(client):
-    """POST parameter "outcome" is converted to upper-case."""
-    data = brew_build_request_data(outcome="failed")
+@pytest.mark.parametrize("outcome", ["failed", " failed "])
+def test_api_v3_outcome_normalize(outcome, client):
+    """POST parameter "outcome" is converted to upper-case and stripped."""
+    data = brew_build_request_data(outcome=outcome)
     r = client.post("/api/v3/results/brew-builds", json=data)
     assert r.status_code == 201, r.text
     assert r.json["outcome"] == "FAILED"
 
 
 def test_api_v3_outcome_bad_type(client):
-    """POST parameter "outcome" is converted to upper-case."""
+    """POST parameter "outcome" must be a string."""
     data = brew_build_request_data(outcome=0)
+    r = client.post("/api/v3/results/brew-builds", json=data)
+    assert r.status_code == 400, r.text
+    assert r.json == {
+        "validation_error": [
+            {
+                "loc": ["outcome"],
+                "msg": "Input should be a valid string",
+                "type": "string_type",
+                "input": 0,
+                "url": ANY,
+            }
+        ]
+    }
+
+
+def test_api_v3_outcome_bad_value(client):
+    """POST parameter "outcome" must be a supported value."""
+    data = brew_build_request_data(outcome="pass")
     r = client.post("/api/v3/results/brew-builds", json=data)
     assert r.status_code == 400, r.text
     assert r.json == {
@@ -180,7 +199,7 @@ def test_api_v3_outcome_bad_type(client):
                 "loc": ["outcome"],
                 "msg": "Value error, must be one of: AMAZING, ERROR, FAILED, INFO, NEEDS_INSPECTION, PASSED, QUEUED, RUNNING",
                 "type": "value_error",
-                "input": ANY,
+                "input": "pass",
                 "url": ANY,
             }
         ]
